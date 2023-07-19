@@ -77,7 +77,7 @@
 (defvar-local pyim-plus--company-box-enabled nil)
 
 ;;;###autoload
-(defun pyim-plus-enable()
+(defun pyim-plus-enable-capf()
   "Enable pyim capf."
   (interactive)
   (add-hook 'completion-at-point-functions 'pyim-capf nil t)
@@ -86,7 +86,7 @@
     (setq pyim-plus--company-box-enabled t)))
 
 ;;;###autoload
-(defun pyim-plus-disable()
+(defun pyim-plus-disable-capf()
   "Disable pyim capf."
   (interactive)
   (remove-hook 'completion-at-point-functions #'pyim-capf t)
