@@ -79,7 +79,7 @@
   (defun pyim-plus-zh-font-width ()
     "Get Chinese font width."
     (aref (font-info (font-at 0 nil "中文")) 2))
-  ;;; company-box显示中文候选项时会有部分条目遗漏，因为用`frame-char-height'得到的是英文字符的高度。
+  ;;; company-box显示中文候选项时会有部分条目可能显示不了，因为用`frame-char-height'得到的是英文字符的高度。
   (defun pyim-plus-company-box--compute-frame-position (frame)
     (-let* ((window-configuration-change-hook nil)
             ((left top _right _bottom) (company-box--edges))
