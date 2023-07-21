@@ -121,20 +121,27 @@
               company-box--height height
               company-box--chunk-size (/ height char-height))))))
 
+(defun pyim-plus--complete-or-insert ()
+  (interactive)
+  (if pyim-plus--capf-enabled
+      (call-interactively #'company-complete-selection)
+    (call-interactively #'self-insert-command)))
+
 (defvar pyim-plus--enable-count 0)
 ;;;###autoload
 (defun pyim-plus-enable-capf()
   "Enable pyim capf."
   (interactive)
   (add-hook 'completion-at-point-functions 'pyim-capf nil t)
-  (setq-local pyim-plus--capf-enabled t)
-  (when (= pyim-plus--enable-count 0)
-    (define-key company-active-map (kbd "SPC") #'company-complete-selection))
-  (when (and company-box-mode
-             (not pyim-plus--company-box-adviced))
-    (advice-add 'company-box--compute-frame-position :override #'pyim-plus-company-box--compute-frame-position)
-    (setq pyim-plus--company-box-adviced t))
-  (setq pyim-plus--enable-count (1+ pyim-plus--enable-count)))
+  (unless pyim-plus--capf-enabled
+    (setq-local pyim-plus--capf-enabled t)
+    (when (= pyim-plus--enable-count 0)
+      (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert))
+    (when (and company-box-mode
+               (not pyim-plus--company-box-adviced))
+      (advice-add 'company-box--compute-frame-position :override #'pyim-plus-company-box--compute-frame-position)
+      (setq pyim-plus--company-box-adviced t))
+    (setq pyim-plus--enable-count (1+ pyim-plus--enable-count))))
 
 (defun pyim-plus--kill-buffer-hook-func ()
   (when pyim-plus--capf-enabled
@@ -146,14 +153,15 @@
 (defun pyim-plus-disable-capf()
   "Disable pyim capf."
   (interactive)
-  (remove-hook 'completion-at-point-functions #'pyim-capf t)
-  (setq-local pyim-plus--capf-enabled nil)
-  (setq pyim-plus--enable-count (1- pyim-plus--enable-count))
-  (when (= pyim-plus--enable-count 0)
-    (define-key company-active-map (kbd "SPC") #'company-complete-selection t)
-    (when pyim-plus--company-box-adviced
-      (setq pyim-plus--company-box-adviced nil)
-      (advice-remove 'company-box--compute-frame-position #'pyim-plus-company-box--compute-frame-position))))
+  (when pyim-plus--capf-enabled
+    (remove-hook 'completion-at-point-functions #'pyim-capf t)
+    (setq-local pyim-plus--capf-enabled nil)
+    (setq pyim-plus--enable-count (1- pyim-plus--enable-count))
+    (when (= pyim-plus--enable-count 0)
+      (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert t)
+      (when pyim-plus--company-box-adviced
+        (setq pyim-plus--company-box-adviced nil)
+        (advice-remove 'company-box--compute-frame-position #'pyim-plus-company-box--compute-frame-position)))))
 
 ;;; evil-escape integration
 (with-eval-after-load 'evil-escape
