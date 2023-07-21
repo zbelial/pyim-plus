@@ -21,8 +21,6 @@
                 stop t))
         (if (or (and (>= char ?a)
                      (<= char ?z))
-                (and (>= char ?A)
-                     (<= char ?Z))
                 (= char ?'))
             (goto-char (1- (point)))
           (setq start (point))
@@ -70,30 +68,92 @@
                 words))))
           :exclusive 'no)))
 
-(defun pyim-plus-zh-font-height ()
-  "Get Chinese font height."
-  (aref (font-info (font-at 0 nil "中文")) 3))
+(defvar pyim-plus--company-box-adviced nil)
+(defvar-local pyim-plus--capf-enabled nil)
 
-(defvar-local pyim-plus--company-box-enabled nil)
+(with-eval-after-load 'company-box
+  (defun pyim-plus-zh-font-height ()
+    "Get Chinese font height."
+    (aref (font-info (font-at 0 nil "中文")) 3))
 
+  (defun pyim-plus-zh-font-width ()
+    "Get Chinese font width."
+    (aref (font-info (font-at 0 nil "中文")) 2))
+  ;;; company-box显示中文候选项时会有部分条目遗漏，因为用`frame-char-height'得到的是英文字符的高度。
+  (defun pyim-plus-company-box--compute-frame-position (frame)
+    (-let* ((window-configuration-change-hook nil)
+            ((left top _right _bottom) (company-box--edges))
+            (window-tab-line-height (if (fboundp 'window-tab-line-height)
+                                        (window-tab-line-height)
+                                      0))
+            (top (+ top window-tab-line-height))
+            (char-height (pyim-plus-zh-font-height))
+            (char-width (pyim-plus-zh-font-width))
+            (height (* (min company-candidates-length company-tooltip-limit) char-height))
+            (space-numbers (if (eq company-show-quick-access 'left) char-width 0))
+            (frame-resize-pixelwise t)
+            (mode-line-y (company-box--point-bottom))
+            ((p-x . p-y) (company-box--prefix-pos))
+            (p-y-abs (+ top p-y))
+            (y (or (and (> p-y-abs (/ mode-line-y 2))
+                        (<= (- mode-line-y p-y) (+ char-height height))
+                        (> (- p-y-abs height) 0)
+                        (- p-y height))
+                   (+ p-y char-height)))
+            (height (or (and (> y p-y)
+                             (> height (- mode-line-y y))
+                             (- mode-line-y y))
+                        height))
+            (height (- height (mod height char-height)))
+            (scrollbar-width (if (eq company-box-scrollbar 'left) (frame-scroll-bar-width frame) 0))
+            (x (if (eq company-box-frame-behavior 'point)
+                   p-x
+                 (if company-box--with-icons-p
+                     (- p-x (* char-width (+ company-box-icon-right-margin (if (= company-box--space 2) 2 3))) space-numbers scrollbar-width)
+                   (- p-x (if (= company-box--space 0) 0 char-width) space-numbers scrollbar-width)))))
+      (setq company-box--x (max (+ x left) 0)
+            company-box--top (+ y top)
+            company-box--height height
+            company-box--chunk-size (/ height char-height))
+      (with-current-buffer (company-box--get-buffer)
+        (setq company-box--x (max (+ x left) 0)
+              company-box--top (+ y top)
+              company-box--height height
+              company-box--chunk-size (/ height char-height))))))
+
+(defvar pyim-plus--enable-count 0)
 ;;;###autoload
 (defun pyim-plus-enable-capf()
   "Enable pyim capf."
   (interactive)
   (add-hook 'completion-at-point-functions 'pyim-capf nil t)
-  (when company-box-mode
-    (company-box-mode -1)
-    (setq pyim-plus--company-box-enabled t)))
+  (setq-local pyim-plus--capf-enabled t)
+  (when (= pyim-plus--enable-count 0)
+    (define-key company-active-map (kbd "SPC") #'company-complete-selection))
+  (when (and company-box-mode
+             (not pyim-plus--company-box-adviced))
+    (advice-add 'company-box--compute-frame-position :override #'pyim-plus-company-box--compute-frame-position)
+    (setq pyim-plus--company-box-adviced t))
+  (setq pyim-plus--enable-count (1+ pyim-plus--enable-count)))
+
+(defun pyim-plus--kill-buffer-hook-func ()
+  (when pyim-plus--capf-enabled
+    (call-interactively #'pyim-plus-disable-capf)))
+
+(add-hook 'kill-buffer-hook #'pyim-plus--kill-buffer-hook-func)
 
 ;;;###autoload
 (defun pyim-plus-disable-capf()
   "Disable pyim capf."
   (interactive)
   (remove-hook 'completion-at-point-functions #'pyim-capf t)
-  (when (and pyim-plus--company-box-enabled
-             (fboundp 'company-box-mode))
-    (company-box-mode)
-    (setq pyim-plus--company-box-enabled nil)))
+  (setq-local pyim-plus--capf-enabled nil)
+  (setq pyim-plus--enable-count (1- pyim-plus--enable-count))
+  (when (= pyim-plus--enable-count 0)
+    (define-key company-active-map (kbd "SPC") #'company-complete-selection t)
+    (when pyim-plus--company-box-adviced
+      (setq pyim-plus--company-box-adviced nil)
+      (advice-remove 'company-box--compute-frame-position #'pyim-plus-company-box--compute-frame-position))))
 
 ;;; evil-escape integration
 (with-eval-after-load 'evil-escape
