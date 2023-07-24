@@ -1,7 +1,6 @@
 ;; pyim-plus.el --- Enhancement to pyim.  -*- lexical-binding: t; -*-
 
 
-(require 'cl-lib)
 (require 'seq)
 (require 'pyim)
 
@@ -129,19 +128,20 @@
 
 (defvar pyim-plus--enable-count 0)
 ;;;###autoload
-(defun pyim-plus-enable-capf()
+(defun pyim-plus-enable-capf ()
   "Enable pyim capf."
   (interactive)
-  (add-hook 'completion-at-point-functions 'pyim-capf nil t)
-  (unless pyim-plus--capf-enabled
-    (setq-local pyim-plus--capf-enabled t)
-    (when (= pyim-plus--enable-count 0)
-      (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert))
-    (when (and company-box-mode
-               (not pyim-plus--company-box-adviced))
-      (advice-add 'company-box--compute-frame-position :override #'pyim-plus-company-box--compute-frame-position)
-      (setq pyim-plus--company-box-adviced t))
-    (setq pyim-plus--enable-count (1+ pyim-plus--enable-count))))
+  (with-current-buffer (current-buffer)
+    (add-hook 'completion-at-point-functions 'pyim-capf nil t)
+    (unless pyim-plus--capf-enabled
+      (setq-local pyim-plus--capf-enabled t)
+      (when (= pyim-plus--enable-count 0)
+        (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert))
+      (when (and company-box-mode
+                 (not pyim-plus--company-box-adviced))
+        (advice-add 'company-box--compute-frame-position :override #'pyim-plus-company-box--compute-frame-position)
+        (setq pyim-plus--company-box-adviced t))
+      (setq pyim-plus--enable-count (1+ pyim-plus--enable-count)))))
 
 (defun pyim-plus--kill-buffer-hook-func ()
   (when pyim-plus--capf-enabled
@@ -150,18 +150,19 @@
 (add-hook 'kill-buffer-hook #'pyim-plus--kill-buffer-hook-func)
 
 ;;;###autoload
-(defun pyim-plus-disable-capf()
+(defun pyim-plus-disable-capf ()
   "Disable pyim capf."
   (interactive)
-  (when pyim-plus--capf-enabled
-    (remove-hook 'completion-at-point-functions #'pyim-capf t)
-    (setq-local pyim-plus--capf-enabled nil)
-    (setq pyim-plus--enable-count (1- pyim-plus--enable-count))
-    (when (= pyim-plus--enable-count 0)
-      (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert t)
-      (when pyim-plus--company-box-adviced
-        (setq pyim-plus--company-box-adviced nil)
-        (advice-remove 'company-box--compute-frame-position #'pyim-plus-company-box--compute-frame-position)))))
+  (with-current-buffer (current-buffer)
+    (when pyim-plus--capf-enabled
+      (remove-hook 'completion-at-point-functions #'pyim-capf t)
+      (setq-local pyim-plus--capf-enabled nil)
+      (setq pyim-plus--enable-count (1- pyim-plus--enable-count))
+      (when (= pyim-plus--enable-count 0)
+        (define-key company-active-map (kbd "SPC") #'pyim-plus--complete-or-insert t)
+        (when pyim-plus--company-box-adviced
+          (setq pyim-plus--company-box-adviced nil)
+          (advice-remove 'company-box--compute-frame-position #'pyim-plus-company-box--compute-frame-position))))))
 
 ;;; evil-escape integration
 (with-eval-after-load 'evil-escape
@@ -190,6 +191,7 @@
 
 ;;; convert string to Chinese before point
 (defvar-local pyim-plus-convert-flag nil)
+;;;###autoload
 (defun pyim-plus-convert-string-at-point ()
   (interactive)
   (if (pyim-string-match-p "[[:punct:]：－]" (pyim-char-before-to-string 0))
@@ -210,3 +212,5 @@
 ;; (remove-hook 'pyim-process-ui-hide-hook #'pyim-plus-after-pyim-convert-string-at-point)
 
 (provide 'pyim-plus)
+
+;;; pyim-plus.el ends here
